@@ -5,17 +5,9 @@ from googleapiclient.discovery import build
 import googleapiclient.errors
 import pandas as pd
 
-Anirudh = "UC1mupr-2YbkxQVmcO3ve6SA"
-plipplip= "UCbq544I2cTyvcrZwmnSIj9Q"
-DSTamil = 'UCuI5XcJYynHa5k_lqDzAgwQ'
-hiphop = 'UC3Izrk2fUSIEwdcH0kNdzeQ'
-
 #Api key connection
-# 'beastmode' = AIzaSyAw_wP7hD340sp2OJ3qzq3EM6OOOYNctaU
-# 'thirusaravana' = AIzaSyDi9hZMNjVqjmQ_WSsbGVDRSbqlusfCrfA
-
 def Api_connect():
-    API_KEY = 'AIzaSyAw_wP7hD340sp2OJ3qzq3EM6OOOYNctaU'
+    API_KEY = '--APIKEY--'
 
     # Create a YouTube service object
     youtube = build('youtube', 'v3', developerKey=API_KEY)
@@ -43,11 +35,10 @@ def get_channel_info(channel_id):
                 Playlist_Id = i['contentDetails']['relatedPlaylists']['uploads']
                 )       
     return data
-    
+
 
 
 # function to get channel ids 
-
 def get_video_ids(channel_id):
     Video_Ids = []
     response = youtube.channels().list(id =channel_id ,
@@ -126,10 +117,7 @@ def get_video_info(Video_Ids):
             video_data.append(data)
     return video_data  
 
-
-
 # get comment details
-
 def get_comment_info(video_ids):
     comment_data =[]
     try:    
@@ -157,7 +145,6 @@ def get_comment_info(video_ids):
 
 
 # get playlist details 
-
 def get_playlist_details(channel_id):
     next_page_token = None
     All_data = []
@@ -194,10 +181,10 @@ import mysql.connector
 
 # Establishing connection to MySQL
 conn = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="root",
-    database="yt_dup"
+    host="-----",
+    user="----",
+    password="----",
+    database="----"
 )
 
 # Creating a cursor object
@@ -275,7 +262,7 @@ conn.close()
 from sqlalchemy import create_engine
 import json
 
-engine = create_engine('mysql://root:root@localhost/yt_dup')
+engine = create_engine('mysql://---URL---')
 
 def channel_details(channel_id):
 
@@ -308,7 +295,7 @@ def channel_details(channel_id):
 def execute_query(query):
     # Execute SQL query using pandas
     try:
-        result = pd.read_sql_query(query, 'mysql://root:root@localhost/yt_dup')
+        result = pd.read_sql_query(query, 'mysql://--URL---')
         return result
     except Exception as e:
         st.error(f"Error executing SQL query: {e}")
@@ -388,10 +375,10 @@ import mysql.connector
 # to remove channel data
 def remove_channel_data(channel_id):
     conn = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="root",
-    database="yt_dup"
+    host="----",
+    user="----",
+    password="----",
+    database="----"
     )
     print('started')
 
@@ -457,10 +444,10 @@ if opt == 'Home':
             st.error("Please enter a YouTube Channel ID.")
         # Connect to MySQL
     conn = mysql.connector.connect(
-        host='localhost',
-        user='root',
-        password='root',
-        database='yt_dup'
+        host='----',
+        user='----',
+        password='----',
+        database='----'
     )
     cursor = conn.cursor()
 
