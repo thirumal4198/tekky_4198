@@ -4,13 +4,9 @@ import json
 import pandas as pd
 import requests
 import plotly.express as px
-
 from sqlalchemy import create_engine
 
 print(0)
-
-
-
 engine = create_engine('mysql://root:root@localhost/project2')
 
 query1 = "SELECT * FROM aggregated_transaction"
@@ -213,7 +209,6 @@ def district_vs_registered_users(df,state):
 
 
 #top_insurance_charts
-
 def display_top_insurance_charts(df):
     # Select year and quarter
     year = st.selectbox('Select Year', df['years'].unique())
@@ -276,7 +271,6 @@ def display_top_insurance_charts(df):
 
 
 #Top Transaaction analysis
-
 def display_top_transaction_charts(df):
     # Select year and quarter
     year = st.selectbox(' Year ', df['years'].unique())
@@ -300,7 +294,6 @@ def display_top_transaction_charts(df):
                   color_discrete_sequence=px.colors.qualitative.Safe)
 
     # Create choropleth map for transaction_amount
-
     url = 'https://gist.githubusercontent.com/jbrobst/56c13bbbf9d97d187fea01ca62ea5112/raw/e388c4cae20aa53cb5090210a42ebb9b765c0a36/india_states.geojson'
     response = requests.get(url)
     data1 = json.loads(response.content)
@@ -371,11 +364,7 @@ def display_top_user_chart_by_state(filtered_df):
     fig.update_xaxes(type='category')
 
     st.plotly_chart(fig)
-
     return state_data
-
-
-
 
 
 #streamlit
@@ -473,10 +462,6 @@ elif select == 'Data Exploration':
 
             map_insu_District(map_insu_tac_y_Q,states)
 
-
-
-
-
         if method == 'Map Transaction':
             col1,col2 = st.columns(2)
             with col1:
@@ -500,7 +485,6 @@ elif select == 'Data Exploration':
 
             map_insu_District(map_tran_tac_y_Q,states)
 
-
         if method == 'Map User':
             st.title('Map User Data Analysis')
             year = st.selectbox('Select Year', map_user_df['years'].unique())
@@ -511,7 +495,7 @@ elif select == 'Data Exploration':
             selected_state = st.selectbox('Select state', map_user_Y_Q['State'].unique())
             district_vs_registered_users(map_user_Y_Q,selected_state)
             
-
+    #Top_analysis
     with tab3:
         method = st.radio('select the method',['Top Insurance','Top Transaction','Top User'])
 
@@ -529,7 +513,6 @@ elif select == 'Data Exploration':
             st.write(state_data)
 
 elif 'Top Charts':
-    
     question = st.selectbox('select the question',['1. Transaction Amount and Count of Aggregated Insurance',
                                                    '2. Transaction Amount and Count of map insurance',
                                                    '3 Transaction Amount and count  of Top insurance' ,
