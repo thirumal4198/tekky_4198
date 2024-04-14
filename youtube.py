@@ -489,4 +489,3 @@ if opt =='Analysis':
         # Display the result as a table
         st.table(result)
 
-print('sun')
