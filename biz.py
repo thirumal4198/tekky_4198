@@ -5,17 +5,18 @@ import easyocr
 from PIL import Image
 import numpy as np
 import base64
+import io
 
-def extract_data(img_path):
+def extract_data(img_path): # input as object
     img = Image.open(img_path)
-    img_arr = np.array(img)
+    img_arr = np.array(img) # Replace 'path_to_image.jpg' with the actual path to the uploaded image
     reader = easyocr.Reader(['en'])
     results = reader.readtext(img_arr,detail=0)
     return results, img
 
 def extract_information(ocr_results):
-    company_name = ''
     cardholder_name = ocr_results[0]
+    company_name = ''
     designation = ''
     mobile_numbers = []
     email_address = ''
@@ -24,9 +25,8 @@ def extract_information(ocr_results):
     Pincode = ''
 
     for text in ocr_results:
-        if 'digitals' in text.lower():
-            company_name = 'Selva Digitals'
-        elif any(char.isalpha() for char in text):
+
+        if any(char.isalpha() for char in text):
             company_name = text
 
         if any(word in text.lower() for word in ['manager', 'executive', 'ceo', 'founder', 'president']):
@@ -38,230 +38,199 @@ def extract_information(ocr_results):
         if '@' in text and '.' in text:
             email_address = text
 
-        if 'www' in text.lower() and '.' in text.lower() and '@' not in text:
+        if 'www' in text.lower() or '.com' in text.lower() and '@' not in text:
             website_url = text
 
         if any(char.isdigit() for char in text) and any(char.isalpha() for char in text) and '@' not in text:
             address += text + ' '
 
-        if text.isdigit() and len(text) == 6:
+        if (text.isdigit() and len(text) == 6):
             Pincode = text
 
     address = address.strip()
 
+    import re
+    pincode_regex = r"\b\d{6,7}\b"
+    pincodes = re.findall(pincode_regex, address)
+    if pincodes:
+        Pincode = pincodes[0]
+
+    address = re.sub(pincode_regex, '', address)
+
     extracted_info = {
-        'Company Name': company_name,
-        'Card Holder Name': cardholder_name,
+        'CardHolderName': cardholder_name,
+        'CompanyName': company_name,
         'Designation': designation,
-        'Mobile Numbers': ', '.join(mobile_numbers),
-        'Email Address': email_address,
-        'Website URL': website_url,
+        'MobileNumbers': ', '.join(mobile_numbers),
+        'EmailAddress': email_address,
+        'WebsiteURL': website_url,
         'Address': address,
         'Pincode': Pincode
     }
 
     return extracted_info
 
+def fetch_data():
+    mydb = sqlite3.connect('b.db')
+    cursor = mydb.cursor()
+    cursor.execute("SELECT * FROM bizcard_details")
+    rows = cursor.fetchall()
+    return rows
 
-# Create a Streamlit app
-st.title('BizCardX: Business Card Data Extraction')
-
-# File uploader for business card image
-uploaded_file = st.file_uploader("Upload Business Card Image", type=["jpg", "png", "jpeg"])
-
+#streamlit Part
+st.set_page_config(layout='wide')
+st.title('Bizcardx: Business Card Data Extraction')
+col1,col2,col3 = st.columns([1,1,1])
+with col1:
+  uploaded_file = st.file_uploader('Upload Business Card Image',type=['jpg','png','jpeg'])
+with col2:
+  if uploaded_file is not None:
+      st.image(uploaded_file,width =500)
 if uploaded_file is not None:
-    st.image(uploaded_file, width=300)
+    #st.image(uploaded_file,width =300)
     text_img, input_img = extract_data(uploaded_file)
     extracted_info = extract_information(text_img)
-    for key, value in extracted_info.items():
-        if key != 'Mobile Numbers':  # Display mobile numbers in a text area
-            extracted_info[key] = st.text_input(key, value)
-        else:
-            extracted_info[key] = st.text_area(key, value)
-    if st.button("Confirm Information"):
-        # Convert extracted information to DataFrame
-        df = pd.DataFrame([extracted_info])
+    col1,col2 = st.columns(2)
+    with col1:
+      for key,values in extracted_info.items():
+          extracted_info[key]= st.text_input(key,values)
+    with col2:
+      df = pd.DataFrame([extracted_info])
+      data = df.transpose()
+      data.columns = ['DETAILS']
+      st.dataframe(data)
 
-        # Convert image to base64 encoded string
-        img_str = base64.b64encode(uploaded_file.read()).decode('utf-8')
-
-        # Add a new column to the DataFrame containing the base64 encoded image
-        df['Uploaded Image'] = [img_str]
-
-        st.dataframe(df)  # Display DataFrame using st.dataframe()
-        if st.button('Upload'):
-            # Establish connection to SQLite database
-            conn = sqlite3.connect('/root/biz.db')
-            c = conn.cursor()
-            # Create table if not exists
-            c.execute('''CREATE TABLE IF NOT EXISTS biz_table (
-                         CompanyName TEXT,
-                         CardHolderName TEXT,
-                         Designation TEXT,
-                         MobileNumbers TEXT,
-                         EmailAddress TEXT,
-                         WebsiteURL TEXT,
-                         Address TEXT,
-                         Pincode TEXT,
-                         UploadedImage TEXT
-                         )''')
-            # Insert data into the table
-            c.execute('''INSERT INTO biz_table (CompanyName, CardHolderName, Designation, MobileNumbers, EmailAddress, WebsiteURL, Address, Pincode, UploadedImage)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                        (extracted_info['Company Name'],
-                         extracted_info['Card Holder Name'],
-                         extracted_info['Designation'],
-                         extracted_info['Mobile Numbers'],
-                         extracted_info['Email Address'],
-                         extracted_info['Website URL'],
-                         extracted_info['Address'],
-                         extracted_info['Pincode'],
-                         img_str))
-
-            # Commit changes and close connection
-            conn.commit()
-            conn.close()
-            st.write('Data uploaded successfully.')
-
-    method = st.radio('Select the method',['None','preview','Modify'])
-    
-    if method=='None':
-      st.write('')
-    
-
-    if method == 'Preview':
-      mydb = sqlite3.connect('biz.db')
-      cursor = mydb.cursor()
-
-      select_query = 'Select * from biz_table'
-      cursor.execute(select_query)
-      table= cursor.fetchall()
-      mydb.commit()
-
-      table_df - pd.DataFrame(table, columns=('CompanyName', 'CardHolderName', 'Designation', 'MobileNumbers',
-                                             'EmailAddress', 'WebsiteURL','Address','Pincode','UploadedImage') )
-      st.dataframe(table_df)
-
-    elif method=='Modify':
-      mydb = sqlite3.connect('biz.db')
-      cursor = mydb.cursor()
-
-      select_query = 'Select * from biz_table'
-      cursor.execute(select_query)
-      table= cursor.fetchall()
-      mydb.commit()
-
-      table_df - pd.DataFrame(table, columns=('CompanyName', 'CardHolderName', 'Designation', 'MobileNumbers',
-                                             'EmailAddress', 'WebsiteURL','Address','Pincode','UploadedImage') )
-      
-      col1,col2 = st.column(2)
-      with col1:
-        selected_name = st.selectbox('Select the Name', table_df['CardHolderName'])
-      df_3 = table_df[table_df['CardHolderName']== selected_name]
-
-      
-      df_4 = df_3.copy()
-      
-
-      col1,col2 = st.columns(2)
-      with col1:
-        mo_name = st.text_input('Name',df-3['CardHolderName'].unique()[0])
-        mo_desi = st.text_input('Designation',df-3['CardHolderName'].unique()[0])
-        mo_com_name = st.text_input('CompanyName',df-3['CompanyName'].unique()[0])
-        mo_contact = st.text_input('MobileNumbers',df-3['MobileNumbers'].unique()[0])
-        mo_email = st.text_input('EmailAddress',df-3['EmailAddress'].unique()[0])
-
-        df_4['Name']= mo_name
-        df_4['Designation']= mo_desi
-        df_4['CompanyName']= mo_com_name
-        df_4['MobileNumbers']= mo_contact
-        df_4['EmailAddress']= mo_email
-
-      with col2:
-        mo_website = st.text_input('WebsiteURL',df-3['WebsiteURL'].unique()[0])
-        mo_address = st.text_input('Address',df-3['Address'].unique()[0])
-        mo_pincode = st.text_input('Pincode',df-3['Pincode'].unique()[0])
-        mo_image = st.text_input('UploadedImage',df-3['UploadedImage'].unique()[0])
-
-        df_4['WebsiteURL']= mo_website
-        df_4['Address']= mo_address
-        df_4['Pincode']= mo_pincode
-        df_4['UploadedImage']= mo_image
-      
-      st.dataframe(df_4)
-      col1,col2 = st.columns(2)
-      with col1:
-        button_3 = st.button('Modify', use_container_width = True)
-
-      if button_3:
-        mydb = sqlite3.connect('biz.db')
+    Confirm = st.button('Confirm & Upload')
+    if Confirm:
+        st.write('uploaded')
+        mydb = sqlite3.connect('b.db')
         cursor = mydb.cursor()
 
-        cursor.execute(f'Delete from table wherer name = "{selected_name}"')
+        #table creation
+        create_table_query = '''CREATE TABLE IF NOT EXISTS bizcard_details (
+                              cardholdername varchar(255),
+                              companyname varchar(255),
+                              designation varchar(255),
+                              mobilenumbers varchar(255),
+                              emailaddress varchar(255),
+                              websiteurl text ,
+                              address text,
+                              pincode varchar(255),
+                              uploaded_image BLOB
+                          )'''
+        #st.write("CREATE TABLE query:", create_table_query)  # Debug statement
+
+        cursor.execute(create_table_query)
         mydb.commit()
 
-        st.success('Saved Successfully')
+        # Fetch the column names from the created table
+        # Insert query
+        mydb = sqlite3.connect('b.db')
+        cursor = mydb.cursor()
+        insert_query = '''INSERT INTO bizcard_details (cardholdername, companyname, designation, mobilenumbers, emailaddress,
+                                                      websiteurl, address, pincode, uploaded_image)
+                                                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'''
+
+        # Convert the image to bytes and store in the database
+        img_bytes = uploaded_file.getvalue()
+        data = df.values.tolist()[0]
+        data.append(img_bytes)
+        cursor.execute(insert_query, data)
+        mydb.commit()
+        #print(1)
+        st.success('successfully uploaded')
 
 
-elif select == 'Delete':
-  
-  mydb = sqlite3.connect('biz.db')
-  cursor = mydb.cursor()
+    st.title('Database Table')
+    #search_term = st.text_input("Search for:")
+    #if search_term:
+        #filtered_df = df[df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
+        #st.write(filtered_df)
 
-  col1,col2 = st.columns(2)
-  
-  with col1:
-    select_query = 'select CardHolderName from biz_table'
+    if st.button('Refresh'):
+        # Fetch data from the database again
+        rows = fetch_data()
+        if rows:
+            df = pd.DataFrame(rows, columns=['CardHolderName','CompanyName', 'Designation', 'MobileNumbers',
+                                             'EmailAddress', 'WebsiteURL', 'Address', 'Pincode', 'UploadedImage'])
+            # Display the updated DataFrame
+            st.write(df)
+    else:
+        rows = fetch_data()
+        if rows:
+            df = pd.DataFrame(rows, columns=['CardHolderName', 'CompanyName', 'Designation', 'MobileNumbers',
+                                             'EmailAddress', 'WebsiteURL', 'Address', 'Pincode', 'UploadedImage'])
+            # Display the updated DataFrame
+            st.write(df)
 
-    cursor.execute(select_query)
-    table1 = cursor.fetchall()
-    mydb.commit()
 
-    name=[]
+    # Fetch data from the database
+    rows = fetch_data()
+    if rows:
+        df = pd.DataFrame(rows, columns=['CardHolderName', 'CompanyName', 'Designation', 'MobileNumbers',
+                                         'EmailAddress', 'WebsiteURL', 'Address', 'Pincode', 'UploadedImage'])
 
-    for i in table1:
-      names.append(i[0])
+        # Display uploaded images
+        for index, row in df.iterrows():
+            if row['UploadedImage'] is not None:
+                image = Image.open(io.BytesIO(row['UploadedImage']))
+                #st.image(image, caption=f"Uploaded Image - {row['CardHolderName']}", use_column_width=False)
 
-    name_select = st.selectbox('select the name',names)
-  
-  with col2:
-    select_query = 'select Designation from biz_table where CardHolderName = '{name_select}''
+        # Add select box for each row
+        cardholder_names = df['CardHolderName'].tolist()
+        selected_cardholder_names = st.multiselect('Select cardholder names', cardholder_names)
 
-    cursor.execute(select_query)
-    table2 = cursor.fetchall()
-    mydb.commit()
+        # Add remove button
 
-    Designations=[]
+        # Add modify button
+        if st.button('View/Modify'):
+            for card_holder_name in selected_cardholder_names:
+                # Get the values of the selected row
+                company_name = df.loc[df['CardHolderName'] == card_holder_name, 'CompanyName'].iloc[0]
+                designation = df.loc[df['CardHolderName'] == card_holder_name, 'Designation'].iloc[0]
+                mobile_numbers = df.loc[df['CardHolderName'] == card_holder_name, 'MobileNumbers'].iloc[0]
+                email_address = df.loc[df['CardHolderName'] == card_holder_name, 'EmailAddress'].iloc[0]
+                website_url = df.loc[df['CardHolderName'] == card_holder_name, 'WebsiteURL'].iloc[0]
+                address = df.loc[df['CardHolderName'] == card_holder_name, 'Address'].iloc[0]
+                pincode = df.loc[df['CardHolderName'] == card_holder_name, 'Pincode'].iloc[0]
+                uploaded_image = df.loc[df['CardHolderName'] == card_holder_name, 'UploadedImage'].iloc[0]
 
-    for j in table1:
-      Designations.append(j[0])
+                # Display input fields to modify the values
+                col1,col2 = st.columns(2)
+                with col1:
+                  new_company_name = st.text_input('Company Name', company_name, key=f'company_name_{card_holder_name}')
+                  new_designation = st.text_input('Designation', designation, key=f'designation_{card_holder_name}')
+                  new_mobile_numbers = st.text_input('Mobile Numbers', mobile_numbers, key=f'mobile_numbers_{card_holder_name}')
+                  new_email_address = st.text_input('Email Address', email_address, key=f'email_address_{card_holder_name}')
+                  new_website_url = st.text_input('Website URL', website_url, key=f'website_url_{card_holder_name}')
+                  new_address = st.text_input('Address', address, key=f'address_{card_holder_name}')
+                  new_pincode = st.text_input('Pincode', pincode, key=f'pincode_{card_holder_name}')
+                with col2:
+                  if uploaded_image is not None:
+                    image = Image.open(io.BytesIO(uploaded_image))
+                    st.image(image, caption=f"Uploaded Image - {card_holder_name}", width=500)
+                # Update the selected row in the database
+                mydb = sqlite3.connect('b.db')
+                cursor = mydb.cursor()
 
-    Designation_select = st.selectbox('select the designation',Designations)
+                cursor.execute("UPDATE bizcard_details SET CompanyName=?, Designation=?, "
+                                "MobileNumbers=?, EmailAddress=?, WebsiteURL=?, Address=?, Pincode=? "
+                                "WHERE CardHolderName=?", (new_company_name, new_designation,
+                                                            new_mobile_numbers, new_email_address, new_website_url,
+                                                            new_address, new_pincode, card_holder_name))
+                mydb.commit()
+                st.success('All changes saved')
+                break  # Exit the loop after updating the first selected row
 
-  if name_select and designation_select:
-    col1,col2,col3 = st.columns(3)
+        if st.button('Remove'):
 
-    with col1:
-      st.write(f"selected Name : {name_select}")
-      st.write('')
-      st.write('')
-      st.write('')
-      st.write(f'Selected Designation : {designation_select}')
-     
-    with col2:
-      st.write('')
-      st.write('')
-      st.write('')
-      st.write('')
+            # Remove selected rows from the database table
+            mydb = sqlite3.connect('b.db')
+            cursor = mydb.cursor()
+            for card_holder_name in selected_cardholder_names:
+                cursor.execute("DELETE FROM bizcard_details WHERE CardHolderName=?", (card_holder_name,))
+            mydb.commit()
+            st.write('Data removed')
 
-      remove = st.buton('Delete', use_container width = True)
-
-      if remove:
-        cursor.execute(f"Delete from biz_table where CardHolderName = '{name_select}' and Designation = '{designation_select}'" )
-        mydb.commit(
-            
-        st.warning('Deleted')
-        )
-# Run Streamlit app
-if __name__ == "__main__":
+if __name__ == '__main__':
     pass
